@@ -332,6 +332,7 @@ class DCGAN(object):
 
         # 每训练100epoch保存一次生成的图片
         # 从第1个epoch开始
+        # 保存的图片命名为epoch_批次
         if np.mod(counter, 100) == 1:
           if config.dataset == 'mnist':
             samples, d_loss, g_loss = self.sess.run(
