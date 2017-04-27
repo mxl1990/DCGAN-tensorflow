@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import division
 import os
 import time
@@ -13,24 +14,26 @@ from utils import *
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
 
+# 主要的类，用以实现DCGAN
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, is_crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
+    # 这里不是太懂的是dim
     """
 
     Args:
       sess: TensorFlow session
-      batch_size: The size of batch. Should be specified before training.
+      batch_size: 批处理的大小
       y_dim: (optional) Dimension of dim for y. [None]
       z_dim: (optional) Dimension of dim for Z. [100]
-      gf_dim: (optional) Dimension of gen filters in first conv layer. [64]
-      df_dim: (optional) Dimension of discrim filters in first conv layer. [64]
-      gfc_dim: (optional) Dimension of gen units for for fully connected layer. [1024]
-      dfc_dim: (optional) Dimension of discrim units for fully connected layer. [1024]
-      c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
+      gf_dim: (optional) gen filter第一层卷积层的个数. [64]
+      df_dim: (optional) discrim filter第一层卷积层的个数. [64]
+      gfc_dim: (optional) gen全连接层的个数. [1024]
+      dfc_dim: (optional) discrim全连接层的个数. [1024]
+      c_dim: (optional) 图片颜色的维度. 灰度图可以设置为1. [3]
     """
     self.sess = sess
     self.is_crop = is_crop
@@ -56,6 +59,8 @@ class DCGAN(object):
     self.c_dim = c_dim
 
     # batch normalization : deals with poor initialization helps gradient flow
+    # batch normalization的实现部分在ops.py中
+    # 如下部分都是先初始化一个指定名字的batch_norm对象
     self.d_bn1 = batch_norm(name='d_bn1')
     self.d_bn2 = batch_norm(name='d_bn2')
 
@@ -72,29 +77,40 @@ class DCGAN(object):
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
+    # 构建模型
     self.build_model()
 
   def build_model(self):
+    '''
+    建立模型
+    '''
     if self.y_dim:
       self.y= tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
 
+    # is_crop影响image_dims维度的确定
     if self.is_crop:
       image_dims = [self.output_height, self.output_width, self.c_dim]
     else:
       image_dims = [self.input_height, self.input_width, self.c_dim]
 
+    # 输入的维度是batch_size*input_height*input_width*c_dim
+    # = batch_size * 图像大小
+    # inputs为真实图像输入
     self.inputs = tf.placeholder(
       tf.float32, [self.batch_size] + image_dims, name='real_images')
+    # sample_inputs为学习后生成的样本的输入
     self.sample_inputs = tf.placeholder(
       tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
 
     inputs = self.inputs
     sample_inputs = self.sample_inputs
 
+    # z是用以生成数据的噪声数据
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
 
+    # 
     if self.y_dim:
       self.G = self.generator(self.z, self.y)
       self.D, self.D_logits = \
@@ -104,10 +120,13 @@ class DCGAN(object):
       self.D_, self.D_logits_ = \
           self.discriminator(self.G, self.y, reuse=True)
     else:
+      # 这里可以看到用z生成G
       self.G = self.generator(self.z)
+      # 用discrim判别输入图像的真假
       self.D, self.D_logits = self.discriminator(inputs)
 
       self.sampler = self.sampler(self.z)
+      # 用discrim判别生成图像的真假
       self.D_, self.D_logits_ = self.discriminator(self.G, reuse=True)
 
     self.d_sum = histogram_summary("d", self.D)
@@ -115,15 +134,22 @@ class DCGAN(object):
     self.G_sum = image_summary("G", self.G)
 
     def sigmoid_cross_entropy_with_logits(x, y):
+      # 应该是尝试兼容不同版本的此函数
       try:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
 
+    # D的loss将真的判断为假的部分
     self.d_loss_real = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+
+    # D的loss将假的判断为真的部分
     self.d_loss_fake = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
+
+
+    # G的loss，#todo:看generator部分
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
 
@@ -137,23 +163,31 @@ class DCGAN(object):
 
     t_vars = tf.trainable_variables()
 
+    # discrim的变量
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
+    # gen的变量
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
 
+    # 用于保存模型结果
     self.saver = tf.train.Saver()
 
   def train(self, config):
-    """Train DCGAN"""
+    """
+    训练DCGAN
+    """
+    # 导入数据，这里可以看到默认数据路径为./data/config.dataset位置
     if config.dataset == 'mnist':
       data_X, data_y = self.load_mnist()
     else:
       data = glob(os.path.join("./data", config.dataset, self.input_fname_pattern))
     #np.random.shuffle(data)
 
+    # 定义D和G的优化器为Adam优化器
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
+    # 初始化变量
     try:
       tf.global_variables_initializer().run()
     except:
@@ -165,13 +199,16 @@ class DCGAN(object):
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
     self.writer = SummaryWriter("./logs", self.sess.graph)
 
+    # 随机生成用以生成样本的噪声z
     sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     
     if config.dataset == 'mnist':
       sample_inputs = data_X[0:self.sample_num]
       sample_labels = data_y[0:self.sample_num]
     else:
+      # 取前sample_num个样本
       sample_files = data[0:self.sample_num]
+      # 获取图片数据
       sample = [
           get_image(sample_file,
                     input_height=self.input_height,
@@ -180,6 +217,7 @@ class DCGAN(object):
                     resize_width=self.output_width,
                     is_crop=self.is_crop,
                     is_grayscale=self.is_grayscale) for sample_file in sample_files]
+      # 这里创建numpy数组(矩阵)
       if (self.is_grayscale):
         sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
       else:
@@ -195,6 +233,7 @@ class DCGAN(object):
       print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
+      # 总数据量/每次训练量=训练次数index
       if config.dataset == 'mnist':
         batch_idxs = min(len(data_X), config.train_size) // config.batch_size
       else:      
@@ -207,6 +246,7 @@ class DCGAN(object):
           batch_images = data_X[idx*config.batch_size:(idx+1)*config.batch_size]
           batch_labels = data_y[idx*config.batch_size:(idx+1)*config.batch_size]
         else:
+          # 获取本批次的数据
           batch_files = data[idx*config.batch_size:(idx+1)*config.batch_size]
           batch = [
               get_image(batch_file,
@@ -261,16 +301,20 @@ class DCGAN(object):
           })
         else:
           # Update D network
+          # 更新使用一般数据集的Discrim
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ self.inputs: batch_images, self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
+          # 更新使用一般数据集的Gen
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
+          # 与论文中不同的地方
+          # 一批次中运行两次g_optim
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={ self.z: batch_z })
           self.writer.add_summary(summary_str, counter)
@@ -280,10 +324,14 @@ class DCGAN(object):
           errG = self.g_loss.eval({self.z: batch_z})
 
         counter += 1
+        # 输出本次批次的训练信息
+        # 可屏蔽以加速
         print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
           % (epoch, idx, batch_idxs,
             time.time() - start_time, errD_fake+errD_real, errG))
 
+        # 每训练100epoch保存一次生成的图片
+        # 从第1个epoch开始
         if np.mod(counter, 100) == 1:
           if config.dataset == 'mnist':
             samples, d_loss, g_loss = self.sess.run(
@@ -316,6 +364,8 @@ class DCGAN(object):
             except:
               print("one pic error!...")
 
+        # 每间隔500epoch保存一次当前模型
+        # 从第2个epoch开始
         if np.mod(counter, 500) == 2:
           self.save(config.checkpoint_dir, counter)
 
