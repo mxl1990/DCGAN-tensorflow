@@ -12,6 +12,7 @@ from ops import *
 from utils import *
 
 def conv_out_size_same(size, stride):
+  # size/stride 得出有多少行？
   return int(math.ceil(float(size) / float(stride)))
 
 # 主要的类，用以实现DCGAN
@@ -149,7 +150,9 @@ class DCGAN(object):
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
 
 
-    # G的loss，#todo:看generator部分
+    # G的loss
+    # 就是将其判断为真的部分
+    # 即论文中1-D(G(z))
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
 
