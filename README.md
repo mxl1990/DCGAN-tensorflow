@@ -31,6 +31,8 @@ First, download dataset with:
 
     $ python download.py mnist celebA
 
+This function is deprecated, you may should download these dataset by yourself.
+
 To train a model with downloaded dataset:
 
     $ python main.py --dataset mnist --input_height=28 --output_height=28 --c_dim=1 --is_train
