@@ -92,9 +92,16 @@ def deconv2d(input_, output_shape,
       return deconv
      
 def lrelu(x, leak=0.2, name="lrelu"):
+  # return x > leak*x ? x : leak*x
   return tf.maximum(x, leak*x)
 
 def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0, with_w=False):
+  '''
+  就是将返回input_ * matrix + bias的结果
+  返回的结果的shape被指定为shape[1] * output_size
+  其中shape[1]为input的第二维（感觉这里是不是shape[-1]会更合适）
+  '''
+  # 获取input_的shape保存至list中
   shape = input_.get_shape().as_list()
 
   with tf.variable_scope(scope or "Linear"):
