@@ -151,7 +151,6 @@ class DCGAN(object):
 
 
     # G的loss
-    # 就是将其判断为真的部分
     # 即论文中1-D(G(z))
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
@@ -333,8 +332,8 @@ class DCGAN(object):
           % (epoch, idx, batch_idxs,
             time.time() - start_time, errD_fake+errD_real, errG))
 
-        # 每训练100epoch保存一次生成的图片
-        # 从第1个epoch开始
+        # 每训练100batch保存一次生成的图片
+        # 从第1个batch开始
         # 保存的图片命名为epoch_批次
         if np.mod(counter, 100) == 1:
           if config.dataset == 'mnist':
@@ -368,21 +367,26 @@ class DCGAN(object):
             except:
               print("one pic error!...")
 
-        # 每间隔500epoch保存一次当前模型
-        # 从第2个epoch开始
+        # 每间隔500batch保存一次当前模型
+        # 从第2个batch开始
         if np.mod(counter, 500) == 2:
           self.save(config.checkpoint_dir, counter)
 
   def discriminator(self, image, y=None, reuse=False):
+    # discriminator的网络结构
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
 
       if not self.y_dim:
+        # 每层进行一次卷积，一次leak relu
+        # d_bn开头的代表batch_nomalize操作
         h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
         h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, name='d_h1_conv')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, name='d_h3_conv')))
+        # 做一个随机的正态变化相乘后输出
+        # todo具体看文章
         h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_h3_lin')
 
         return tf.nn.sigmoid(h4), h4
