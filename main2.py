@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import scipy.misc
 import numpy as np
@@ -20,6 +21,7 @@ flags.DEFINE_integer("output_width", None, "The size of the output images to pro
 flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of input images [*]")
+flags.DEFINE_string("dataset_dir", None, "Directory path the dataset in.")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_string("extr_dir", "extr", "Directory name to get extract features images")
@@ -41,6 +43,11 @@ def main(_):
     os.makedirs(FLAGS.checkpoint_dir)
   if not os.path.exists(FLAGS.sample_dir):
     os.makedirs(FLAGS.sample_dir)
+
+  # 默认路径为当前目录下./data/FLAG.dataset
+  if not FLAGS.dataset_dir:
+  	FLAGS.dataset_dir = os.path.join("./data", FLAGS.dataset)
+
 
   #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
   run_config = tf.ConfigProto()
