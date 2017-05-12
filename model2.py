@@ -182,7 +182,7 @@ class DCGAN(object):
     if config.dataset == 'mnist':
       data_X, data_y = self.load_mnist()
     else:
-      data = glob(os.path.join("./data", config.dataset, self.input_fname_pattern))
+      data = glob(os.path.join(config.dataset_dir, self.input_fname_pattern))
     #np.random.shuffle(data)
 
     # 定义D和G的优化器为Adam优化器
@@ -243,7 +243,7 @@ class DCGAN(object):
         batch_idxs = min(len(data_X), config.train_size) // config.batch_size
       else:      
         data = glob(os.path.join(
-          "./data", config.dataset, self.input_fname_pattern))
+          config.dataset_dir, self.input_fname_pattern))
         batch_idxs = min(len(data), config.train_size) // config.batch_size
 
       for idx in xrange(0, batch_idxs):
@@ -353,22 +353,22 @@ class DCGAN(object):
             save_images(samples, [manifold_h, manifold_w],
                   './{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
             print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
-          else:
-            try:
-              samples, d_loss, g_loss = self.sess.run(
-                [self.sampler, self.d_loss, self.g_loss],
-                feed_dict={
-                    self.z: sample_z,
-                    self.inputs: sample_inputs,
-                },
-              )
-              manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
-              manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
-              save_images(samples, [manifold_h, manifold_w],
-                    './{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
-              print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
-            except:
-              print("one pic error!...")
+          # else:
+      try:
+        samples, d_loss, g_loss = self.sess.run(
+          [self.sampler, self.d_loss, self.g_loss],
+        feed_dict={
+                self.z: sample_z,
+                self.inputs: sample_inputs,
+              },
+            )
+        manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
+        manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
+        save_images(samples, [manifold_h, manifold_w],
+                './{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
+        print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
+      except:
+        print("one pic error!...")
 
         # 每间隔500epoch保存一次当前模型
         # 从第2个epoch开始
@@ -393,7 +393,6 @@ class DCGAN(object):
 
 
   def discriminator(self, image, y=None, reuse=False):
-    print("dis invoked")
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
