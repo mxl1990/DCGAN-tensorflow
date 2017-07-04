@@ -18,6 +18,64 @@ pp = pprint.PrettyPrinter()
 
 get_stddev = lambda x, k_h, k_w: 1/math.sqrt(k_w*k_h*x.get_shape()[-1])
 
+# 需要采用多线程进行读取文件
+def get_batch_image(file_queue, batch_size, input_height, input_width,
+                      resize_height=64, resize_width=64,
+                      is_crop=True, is_grayscale=False):
+  # 函数最终返回一个操作
+  # file_queue = tf.train.string_input_producer(image_paths, shuffle=False,capacity=len(image_paths))
+  num_thread = 8
+  thread_list = []
+  for i in range(num_thread):
+    file = file_queue.dequeue()
+    img_contents = tf.read_file(file) # 读取文件
+    img = tf.image.decode_image(img_contents) # 解码图片文件
+    # todo:处理图片
+    img = transform_with_tf(img,input_height,input_width,resize_height,resize_width, is_crop)
+    img.set_shape((resize_height,resize_width, 3))
+
+    thread_list.append([img]) # 放到线程list中
+
+  image_batch = tf.train.batch_join(
+                  thread_list,
+                  batch_size=batch_size,
+                  # shapes=[resize_height, resize_width, 3],
+                  enqueue_many=False,
+                  capacity=4*num_thread*10000, # how long the prefetching is allowed to grow the queues
+                  allow_smaller_final_batch=True
+                  )
+  return image_batch
+
+def transform_with_tf(image, input_height, input_width, 
+              resize_height=64, resize_width=64, is_crop=True):
+  if is_crop:
+    # h,w = input_height, input_width
+    # j = int(round((h - resize_height)/2.))
+    # i = int(round((w - resize_width)/2.)) 
+    # # x[j:j+crop_h, i:i+crop_w]
+    # cropped_image = tf.image.crop_and_resize(
+    #                     image,
+    #                     [[j,j+resize_height,i,i+resize_width],],
+    #                     0,
+    #                     (resize_height,resize_width)
+    #                 ) # todo center_corp_image
+    image = tf.image.central_crop(
+                                          image,
+                                          0.5
+                                          )
+    cropped_image = tf.image.resize_images(image,[resize_height, resize_width])
+  # if is_crop:
+  #   cropped_image = center_crop(
+  #     image, input_height, input_width, 
+  #     resize_height, resize_width)
+  #center_crop(x, crop_h, crop_w,
+                # resize_h=64, resize_w=64):
+  else:
+    cropped_image = tf.image.resize_images(image,[resize_height, resize_width])
+  return tf.image.per_image_standardization(cropped_image)
+  # return np.array(cropped_image)/127.5 - 1.
+  
+
 def show_all_variables():
   model_vars = tf.trainable_variables()
   slim.model_analyzer.analyze_vars(model_vars, print_info=True)
@@ -25,6 +83,7 @@ def show_all_variables():
 def get_image(image_path, input_height, input_width,
               resize_height=64, resize_width=64,
               is_crop=True, is_grayscale=False):
+  # 获取图片数据
   image = imread(image_path, is_grayscale)
   return transform(image, input_height, input_width,
                    resize_height, resize_width, is_crop)
@@ -33,6 +92,7 @@ def save_images(images, size, image_path):
   return imsave(inverse_transform(images), size, image_path)
 
 def imread(path, is_grayscale = False):
+  # 采用scipy的库读取图片
   if (is_grayscale):
     return scipy.misc.imread(path, flatten = True).astype(np.float)
   else:
