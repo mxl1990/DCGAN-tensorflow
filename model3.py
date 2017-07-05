@@ -95,9 +95,9 @@ class DCGAN(object):
 		# 输入的维度是batch_size*input_height*input_width*c_dim
 		# = batch_size * 图像大小
 		# inputs为真实图像输入
-		self.inputs = tf.Variable(tf.zeros([self.batch_size] + image_dims),trainable=False, name='real_images', dtype=tf.float32)
-		# self.inputs = tf.placeholder(
-		# 	tf.float32, [self.batch_size] + image_dims, name='real_images')
+		# self.inputs = tf.Variable(tf.zeros([self.batch_size] + image_dims),trainable=False, name='real_images', dtype=tf.float32)
+		self.inputs = tf.placeholder(
+			tf.float32, [self.batch_size] + image_dims, name='real_images')
 		# sample_inputs为生成的样本的输入
 		self.sample_inputs = tf.placeholder(
 			tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
@@ -255,8 +255,8 @@ class DCGAN(object):
 			for idx in xrange(0, batch_idxs):
 				counter = counter + 1
 				# print("get batch file")
-				image_batch = self.sess.run(batch_image)
-				self.inputs.assign(image_batch)
+				batch_images = self.sess.run(batch_image)
+				# self.inputs.assign(image_batch)
 				# self.input = image_batch
 				# print("finish get batch file")
 				# batch_files = data[idx*config.batch_size:(idx+1)*config.batch_size]
@@ -279,8 +279,8 @@ class DCGAN(object):
 				# Update D network
 				# 更新使用一般数据集的Discrim
 				_, summary_str = self.sess.run([d_optim, self.d_sum],
-					# feed_dict={ self.inputs: batch_images, self.z: batch_z })
-					feed_dict={ self.z: batch_z })
+					feed_dict={ self.inputs: batch_images, self.z: batch_z })
+					# feed_dict={ self.z: batch_z })
 				self.writer.add_summary(summary_str, counter)
 
 				# Update G network
@@ -296,7 +296,7 @@ class DCGAN(object):
 				self.writer.add_summary(summary_str, counter)
 					
 				errD_fake = self.d_loss_fake.eval({ self.z: batch_z })
-				errD_real = self.d_loss_real.eval()
+				errD_real = self.d_loss_real.eval({self.inputs:batch_images})
 				errG = self.g_loss.eval({self.z: batch_z})
 
 				# 输出本次批次的训练信息
