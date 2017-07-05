@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Some codes from https://github.com/Newmu/dcgan_code
 """
@@ -27,11 +28,15 @@ def get_batch_image(file_queue, batch_size, input_height, input_width,
   num_thread = 8
   thread_list = []
   for i in range(num_thread):
-    file = file_queue.dequeue()
-    img_contents = tf.read_file(file) # 读取文件
+    # file = file_queue.dequeue()
+    # img_contents = tf.read_file(file) # 读取文件
+    reader = tf.WholeFileReader()
+    key, img_contents = reader.read(file_queue)
     img = tf.image.decode_image(img_contents) # 解码图片文件
+    # print("get img is", img.shape)
     # todo:处理图片
     img = transform_with_tf(img,input_height,input_width,resize_height,resize_width, is_crop)
+    # 设定一个shape以解决shape最后一个维度为None的情况
     img.set_shape((resize_height,resize_width, 3))
 
     thread_list.append([img]) # 放到线程list中
@@ -41,7 +46,7 @@ def get_batch_image(file_queue, batch_size, input_height, input_width,
                   batch_size=batch_size,
                   # shapes=[resize_height, resize_width, 3],
                   enqueue_many=False,
-                  capacity=4*num_thread*10000, # how long the prefetching is allowed to grow the queues
+                  capacity=4*num_thread*1000, # how long the prefetching is allowed to grow the queues
                   allow_smaller_final_batch=True
                   )
   return image_batch
@@ -49,30 +54,11 @@ def get_batch_image(file_queue, batch_size, input_height, input_width,
 def transform_with_tf(image, input_height, input_width, 
               resize_height=64, resize_width=64, is_crop=True):
   if is_crop:
-    # h,w = input_height, input_width
-    # j = int(round((h - resize_height)/2.))
-    # i = int(round((w - resize_width)/2.)) 
-    # # x[j:j+crop_h, i:i+crop_w]
-    # cropped_image = tf.image.crop_and_resize(
-    #                     image,
-    #                     [[j,j+resize_height,i,i+resize_width],],
-    #                     0,
-    #                     (resize_height,resize_width)
-    #                 ) # todo center_corp_image
-    image = tf.image.central_crop(
-                                          image,
-                                          0.5
-                                          )
-    cropped_image = tf.image.resize_images(image,[resize_height, resize_width])
-  # if is_crop:
-  #   cropped_image = center_crop(
-  #     image, input_height, input_width, 
-  #     resize_height, resize_width)
-  #center_crop(x, crop_h, crop_w,
-                # resize_h=64, resize_w=64):
+    cropped_image = tf.image.resize_image_with_crop_or_pad(image, resize_height, resize_width)
   else:
     cropped_image = tf.image.resize_images(image,[resize_height, resize_width])
   return tf.image.per_image_standardization(cropped_image)
+  # return cropped_image
   # return np.array(cropped_image)/127.5 - 1.
   
 
