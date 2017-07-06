@@ -54,11 +54,11 @@ def get_batch_image(file_queue, batch_size, input_height, input_width,
 def transform_with_tf(image, input_height, input_width, 
               resize_height=64, resize_width=64, is_crop=True):
   if is_crop:
-    cropped_image = tf.image.resize_image_with_crop_or_pad(image, resize_height, resize_width)
-  else:
-    cropped_image = tf.image.resize_images(image,[resize_height, resize_width])
-  return tf.image.per_image_standardization(cropped_image)
-  # return cropped_image
+    image = tf.image.resize_image_with_crop_or_pad(image, input_height, input_width)
+  image = tf.reshape(image, [input_height, input_width, 3])
+  image = tf.image.resize_images(image,[resize_height, resize_width])
+  # return tf.image.per_image_standardization(cropped_image)
+  return image/127.5 - 1
   # return np.array(cropped_image)/127.5 - 1.
   
 
