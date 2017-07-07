@@ -192,7 +192,7 @@ class DCGAN(object):
 			self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
 		self.d_sum = merge_summary(
 				[self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-		self.writer = SummaryWriter("./logs", self.sess.graph)
+		self.writer = SummaryWriter(config.log_dir, self.sess.graph)
 
 		
 		# 每次开始之前检查是否存在已经训练的模型
@@ -317,7 +317,7 @@ class DCGAN(object):
 				manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
 				manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
 				save_images(samples, [manifold_h, manifold_w],
-								'./{}/train_{:02d}.png'.format(config.sample_dir, epoch))
+								'{}/train_{:02d}.png'.format(config.sample_dir, epoch))
 				print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
 			except:
 				print("one pic error!...")
@@ -404,7 +404,7 @@ class DCGAN(object):
 				manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
 				manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
 				save_images(samples, [manifold_h, manifold_w],
-							'./{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
+							'{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
 				print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss)) 
 			except:
 				print("one pic error!...")
@@ -643,12 +643,6 @@ class DCGAN(object):
 			data = glob(os.path.join("./data", config.extr_dir, self.input_fname_pattern))
 
 		print("begin to get image data")
-		
-
-		# if (self.is_grayscale):
-		#   sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
-		# else:
-		#   sample_inputs = np.array(sample).astype(np.float32)
 
 		print("finish image get")
 		if self.is_crop:
