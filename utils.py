@@ -19,29 +19,26 @@ pp = pprint.PrettyPrinter()
 
 get_stddev = lambda x, k_h, k_w: 1/math.sqrt(k_w*k_h*x.get_shape()[-1])
 
-# 需要采用多线程进行读取文件
+# 采用多线程进行读取文件
 def get_batch_image(file_queue, batch_size, input_height, input_width,
                       resize_height=64, resize_width=64,
                       is_crop=True, is_grayscale=False):
-  # 函数最终返回一个操作
-  # file_queue = tf.train.string_input_producer(image_paths, shuffle=False,capacity=len(image_paths))
+  depth = 3
+  if is_grayscale:
+    depth = 1
   num_thread = 8
-  thread_list = []
-  for i in range(num_thread):
+  thread_list = [] # 线程组
+  for i in range(num_thread): # 定义每个线程处理一个文件
     # file = file_queue.dequeue()
     # img_contents = tf.read_file(file) # 读取文件
     reader = tf.WholeFileReader()
     key, img_contents = reader.read(file_queue)
     img = tf.image.decode_image(img_contents) # 解码图片文件
-    # print("get img is", img.shape)
-    # todo:处理图片
-    img = transform_with_tf(img,input_height,input_width,resize_height,resize_width, is_crop)
-    # 设定一个shape以解决shape最后一个维度为None的情况
-    img.set_shape((resize_height,resize_width, 3))
-
+    img = transform_with_tf(img,input_height,input_width,resize_height,resize_width, depth, is_crop) # 处理图片
+    img.set_shape((resize_height,resize_width, depth))# 设定一个shape以解决shape最后一个维度为None的情况
     thread_list.append([img]) # 放到线程list中
 
-  image_batch = tf.train.batch_join(
+  image_batch = tf.train.batch_join( # 合批图片
                   thread_list,
                   batch_size=batch_size,
                   # shapes=[resize_height, resize_width, 3],
@@ -51,17 +48,15 @@ def get_batch_image(file_queue, batch_size, input_height, input_width,
                   )
   return image_batch
 
+# 用tensorflow自带的函数处理图片
 def transform_with_tf(image, input_height, input_width, 
-              resize_height=64, resize_width=64, is_crop=True):
+              resize_height=64, resize_width=64, depth=3, is_crop=True):
   if is_crop:
-    image = tf.image.resize_image_with_crop_or_pad(image, input_height, input_width)
-  image = tf.reshape(image, [input_height, input_width, 3])
-  image = tf.image.resize_images(image,[resize_height, resize_width])
-  # return tf.image.per_image_standardization(cropped_image)
-  return image/127.5 - 1
-  # return np.array(cropped_image)/127.5 - 1.
+    image = tf.image.resize_image_with_crop_or_pad(image, input_height, input_width) # 采用中心裁切调整图片大小
+  image = tf.reshape(image, [input_height, input_width, depth])
+  image = tf.image.resize_images(image,[resize_height, resize_width]) # 压缩图片大小
+  return image/127.5 - 1.
   
-
 def show_all_variables():
   model_vars = tf.trainable_variables()
   slim.model_analyzer.analyze_vars(model_vars, print_info=True)
@@ -69,25 +64,23 @@ def show_all_variables():
 def get_image(image_path, input_height, input_width,
               resize_height=64, resize_width=64,
               is_crop=True, is_grayscale=False):
-  # 获取图片数据
-  image = imread(image_path, is_grayscale)
+  image = imread(image_path, is_grayscale) # 获取图片数据
   return transform(image, input_height, input_width,
                    resize_height, resize_width, is_crop)
 
 def save_images(images, size, image_path):
   return imsave(inverse_transform(images), size, image_path)
 
-def imread(path, is_grayscale = False):
-  # 采用scipy的库读取图片
+def imread(path, is_grayscale = False): # 采用scipy的库读取图片
   if (is_grayscale):
     return scipy.misc.imread(path, flatten = True).astype(np.float)
   else:
     return scipy.misc.imread(path).astype(np.float)
 
-def merge_images(images, size):
-  return inverse_transform(images)
+# def merge_images(images, size):
+#   return inverse_transform(images)
 
-def merge(images, size):
+def merge(images, size): # images是图片列表，size是图片个数
   h, w = images.shape[1], images.shape[2]
   if (images.shape[3] in (3,4)):
     c = images.shape[3]
@@ -106,14 +99,14 @@ def merge(images, size):
     return img
   else:
     raise ValueError('in merge(images,size) images parameter '
-                     'must have dimensions: HxW or HxWx3 or HxWx4')
+                     'must have dimensions: H x W or H x W x 3 or H x W x 4')
 
 def imsave(images, size, path):
   image = np.squeeze(merge(images, size))
   return scipy.misc.imsave(path, image)
 
 def center_crop(x, crop_h, crop_w,
-                resize_h=64, resize_w=64):
+                resize_h=64, resize_w=64): # 中心裁剪算法实现部分
   if crop_w is None:
     crop_w = crop_h
   h, w = x.shape[:2]
@@ -124,16 +117,16 @@ def center_crop(x, crop_h, crop_w,
 
 def transform(image, input_height, input_width, 
               resize_height=64, resize_width=64, is_crop=True):
-  if is_crop:
+  if is_crop: # 需要剪裁，采用中心剪裁处理图片
     cropped_image = center_crop(
       image, input_height, input_width, 
       resize_height, resize_width)
   else:
     cropped_image = scipy.misc.imresize(image, [resize_height, resize_width])
-  return np.array(cropped_image)/127.5 - 1.
+  return np.array(cropped_image)/127.5 - 1. # 使得图片数据在(-1,1)之间？
 
 def inverse_transform(images):
-  return (images+1.)/2.
+  return (images+1.)/2. # 还原真实图片数据，将图片数据区间映射回(0,1)区间
 
 def to_json(output_path, *layers):
   with open(output_path, "w") as layer_f:
