@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import math
 import numpy as np 
 import tensorflow as tf
@@ -57,12 +58,9 @@ def conv2d(input_, output_dim,
     # 生成卷积核的四维的tensor，并从"截断"的正态分布中获取初始值
     w = tf.get_variable('w', [k_h, k_w, input_.get_shape()[-1], output_dim],
               initializer=tf.truncated_normal_initializer(stddev=stddev))
-
     conv = tf.nn.conv2d(input_, w, strides=[1, d_h, d_w, 1], padding='SAME')
-    # biases为0
-    biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
-    # conv = conv + biases
-    conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
+    biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0)) # biases初始为0    
+    conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape()) # conv = conv + biases
 
     return conv
 
@@ -91,7 +89,7 @@ def deconv2d(input_, output_shape,
     else:
       return deconv
      
-def lrelu(x, leak=0.2, name="lrelu"):
+def lrelu(x, leak=0.2, name="lrelu"): # leak relu
   # return x > leak*x ? x : leak*x
   return tf.maximum(x, leak*x)
 
